@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura - Intelligent Face Attendance System</title>
+    
+    <!-- Remix Icons CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    
+    <!-- Link Stylesheet -->
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="nav-container">
+            <a href="#" class="logo nav-link-trigger" data-view="landing-view">
+                <i class="ri-scan-2-line"></i>
+                <span>AURA</span>
+            </a>
+            <nav class="nav-links">
+                <button class="nav-btn nav-link-trigger" data-view="landing-view">
+                    <i class="ri-home-5-line"></i> Home
+                </button>
+                <button class="nav-btn nav-link-trigger" data-view="enroll-view">
+                    <i class="ri-user-add-line"></i> Enroll Face
+                </button>
+                <button class="nav-btn nav-link-trigger" data-view="login-view" id="nav-login-btn">
+                    <i class="ri-lock-password-line"></i> Admin Login
+                </button>
+                <!-- Admin Only buttons hidden by default -->
+                <button class="nav-btn admin-only-btn nav-link-trigger" data-view="admin-view" style="display: none; border-color: var(--border-hover);">
+                    <i class="ri-dashboard-line"></i> Dashboard
+                </button>
+                <button class="nav-btn admin-only-btn" id="admin-logout-btn" style="display: none; color: var(--error);">
+                    <i class="ri-logout-box-r-line"></i> Logout
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Views Controller -->
+    <main>
+
+        <!-- SCREEN 1: LANDING PAGE -->
+        <section id="landing-view" class="view-screen active">
+            <div class="hero-section">
+                <span class="hero-tag">Next-Gen Biometrics</span>
+                <h1 class="hero-title">Intelligent <span>Face Attendance</span> System</h1>
+                <p class="hero-subtitle">Automate your class and office registers with contactless facial recognition matching. Secure, fast, and completely backend-free simulation.</p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary" id="hero-enroll-btn">
+                        <i class="ri-fingerprint-line"></i> Enroll Face Template
+                    </button>
+                    <button class="btn btn-accent" id="hero-admin-btn">
+                        <i class="ri-admin-line"></i> Launch Admin Console
+                    </button>
+                </div>
+            </div>
+
+            <!-- Features Info Grid -->
+            <div class="admin-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 2rem;">
+                <div class="glass-card" style="text-align: center; padding: 2rem;">
+                    <i class="ri-user-face-line" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="margin-bottom: 0.5rem; font-weight: 600;">1. Enroll Student Face</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Register a student profile with their name, Roll ID, department, and map their facial geometry pattern directly using the webcam.</p>
+                </div>
+                <div class="glass-card" style="text-align: center; padding: 2rem;">
+                    <i class="ri-shield-user-line" style="font-size: 2.5rem; color: var(--secondary); margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="margin-bottom: 0.5rem; font-weight: 600;">2. Administrator Login</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Secure access control limits scan execution and log exports to verified system administrators (Credentials: <strong>admin / admin123</strong>).</p>
+                </div>
+                <div class="glass-card" style="text-align: center; padding: 2rem;">
+                    <i class="ri-scan-line" style="font-size: 2.5rem; color: var(--success); margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="margin-bottom: 0.5rem; font-weight: 600;">3. Perform Scan Logging</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Start the live camera scanner or drag-and-drop attendance pictures to run match coordinates, flag logs, and export reports instantly.</p>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- SCREEN 2: STUDENT ENROLLMENT -->
+        <section id="enroll-view" class="view-screen">
+            <div style="margin-bottom: 2rem;">
+                <h2 style="font-size: 2.25rem; font-weight: 700; margin-bottom: 0.5rem;">Biometric Enrollment</h2>
+                <p style="color: var(--text-secondary);">Enter the student details and align their face in the viewfinder guidelines to map coordinates.</p>
+            </div>
+
+            <div class="layout-split">
+                <!-- Webcam Viewfinder -->
+                <div class="glass-card viewfinder-card">
+                    <div class="viewfinder-container">
+                        <div class="scanning-indicator">Camera Active</div>
+                        <!-- Tech Brackets -->
+                        <div class="viewfinder-bracket bracket-tl"></div>
+                        <div class="viewfinder-bracket bracket-tr"></div>
+                        <div class="viewfinder-bracket bracket-bl"></div>
+                        <div class="viewfinder-bracket bracket-br"></div>
+                        
+                        <!-- Laser line -->
+                        <div class="laser-line"></div>
+
+                        <!-- Live Webcam Element -->
+                        <video id="enroll-video" class="camera-feed" autoplay playsinline></video>
+                        <!-- Canvas drawing guidelines overlay -->
+                        <canvas id="enroll-canvas" class="overlay-canvas"></canvas>
+
+                        <!-- Simulated Camera Fallback View -->
+                        <div id="enroll-simulated-feed" class="simulated-feed" style="display: none;">
+                            <i class="ri-webcam-line"></i>
+                            <span>Webcam Access Unavailable</span>
+                            <p style="font-size: 0.8rem; max-width: 250px; color: var(--text-muted);">Proceed with the enrollment form. Face capture will be automatically simulated.</p>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                        <i class="ri-error-warning-line"></i> Please ensure lighting is uniform and face is inside the circular guides.
+                    </div>
+                </div>
+
+                <!-- Registration Form -->
+                <div class="glass-card" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div style="text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <div id="enroll-face-preview" class="profile-preview">
+                            <i class="ri-user-face-line" style="font-size: 2rem; color: var(--text-muted); line-height: 70px;"></i>
+                        </div>
+                        <h4 style="margin-top: 0.75rem; font-weight: 600;">Biometric Preview</h4>
+                    </div>
+
+                    <form id="enroll-form">
+                        <div class="form-group">
+                            <label class="form-label" for="enroll-name">Student Full Name</label>
+                            <input class="form-control" type="text" id="enroll-name" placeholder="e.g. Eleanor Vance" required autocomplete="off">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="enroll-roll">Roll / Student ID</label>
+                                <input class="form-control" type="text" id="enroll-roll" placeholder="e.g. STU202615" required autocomplete="off">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="enroll-dept">Department</label>
+                                <select class="form-control" id="enroll-dept" required>
+                                    <option value="" disabled selected>Select...</option>
+                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Cybersecurity">Cybersecurity</option>
+                                    <option value="AI & Robotics">AI & Robotics</option>
+                                    <option value="Software Engineering">Software Engineering</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit" style="width: 100%; margin-top: 1rem;">
+                            <i class="ri-scan-2-line"></i> Register Face Data
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- SCREEN 3: ADMIN LOGIN -->
+        <section id="login-view" class="view-screen">
+            <div class="login-container glass-card">
+                <div class="login-header">
+                    <i class="ri-shield-keyhole-line"></i>
+                    <h2>Admin Gate</h2>
+                    <p style="color: var(--text-secondary); margin-top: 0.25rem;">Unlock camera control panel and log registries.</p>
+                </div>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <label class="form-label" for="login-username">System Username</label>
+                        <input class="form-control" type="text" id="login-username" placeholder="e.g. admin" required autocomplete="off" value="admin">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 2rem;">
+                        <label class="form-label" for="login-password">Secret Password</label>
+                        <input class="form-control" type="password" id="login-password" placeholder="••••••••" required value="admin123">
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" style="width: 100%;">
+                        <i class="ri-login-box-line"></i> Authenticate credentials
+                    </button>
+                </form>
+
+                <div style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                    Authentication hint: <strong>admin</strong> / <strong>admin123</strong>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- SCREEN 4: ADMIN DASHBOARD PANEL -->
+        <section id="admin-view" class="view-screen">
+            <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h2 style="font-size: 2.25rem; font-weight: 700; margin-bottom: 0.5rem;">Biometric Attendance Dashboard</h2>
+                    <p style="color: var(--text-secondary);">Initiate real-time scanner operations or process document images.</p>
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--success); font-weight: 600; padding: 0.4rem 1rem; border-radius: 9999px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display:block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: statusIndicatorBlink 1s infinite alternate;"></span>
+                    Console Connected
+                </div>
+            </div>
+
+            <!-- Stats Bar Widget -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="ri-user-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-num" id="stat-total-students">0</span>
+                        <span class="stat-label">Total Enrolled</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="ri-user-check-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-num" id="stat-present-today">0</span>
+                        <span class="stat-label">Present Today</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="ri-user-unfollow-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-num" id="stat-absent-today">0</span>
+                        <span class="stat-label">Absent Today</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Control Split -->
+            <div class="admin-grid">
+                
+                <!-- Left panel: Scanners (Webcam & Upload) -->
+                <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <!-- Tabs -->
+                        <div class="control-tabs">
+                            <button class="control-tab-btn active" id="tab-btn-webcam">
+                                <i class="ri-camera-lens-line"></i> Active Camera Scan
+                            </button>
+                            <button class="control-tab-btn" id="tab-btn-upload">
+                                <i class="ri-image-add-line"></i> Upload Scan Image
+                            </button>
+                        </div>
+
+                        <!-- Webcam Pane -->
+                        <div id="attendance-webcam-pane">
+                            <div class="viewfinder-card">
+                                <div class="viewfinder-container" style="aspect-ratio: 16/9;">
+                                    <div class="scanning-indicator">Scanner Standing By</div>
+                                    <div class="viewfinder-bracket bracket-tl"></div>
+                                    <div class="viewfinder-bracket bracket-tr"></div>
+                                    <div class="viewfinder-bracket bracket-bl"></div>
+                                    <div class="viewfinder-bracket bracket-br"></div>
+                                    
+                                    <div class="laser-line"></div>
+                                    
+                                    <!-- Video & Canvas stream -->
+                                    <video id="attendance-video" class="camera-feed" autoplay playsinline></video>
+                                    <canvas id="attendance-canvas" class="overlay-canvas"></canvas>
+
+                                    <!-- Fallback Simulated camera -->
+                                    <div id="attendance-simulated-feed" class="simulated-feed" style="display: none;">
+                                        <i class="ri-eye-line"></i>
+                                        <span>Simulated System Feed</span>
+                                        <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 320px;">Use the simulation controllers below to trigger successful face matches.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Image File Upload Pane -->
+                        <div id="attendance-upload-pane" style="display: none;">
+                            <!-- Drag Zone -->
+                            <div class="drag-zone" id="drag-zone">
+                                <i class="ri-upload-cloud-2-line"></i>
+                                <h3>Drag & Drop Attendance Photo</h3>
+                                <p>Supports JPG, JPEG, PNG formats</p>
+                                <button class="btn btn-secondary btn-sm" type="button" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Select Document File</button>
+                                <input type="file" id="attendance-file-input" style="display: none;" accept="image/*">
+                            </div>
+
+                            <!-- Upload Preview frame -->
+                            <div class="upload-preview-container" id="upload-preview-container" style="display: none; aspect-ratio: 16/9;">
+                                <img src="" id="upload-preview-img" class="upload-preview-img" alt="Uploaded face preview">
+                                <canvas id="upload-canvas" class="overlay-canvas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Controls bottom row -->
+                    <div style="display:flex; justify-content:space-between; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="trigger-scan-btn" style="flex: 1;">
+                            <i class="ri-scan-line"></i> Scan Camera Frame
+                        </button>
+                        <button class="btn btn-secondary btn-sim-manual" style="flex: 1;">
+                            <i class="ri-bug-line"></i> Simulate Match
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right panel: Live Biometric Log stream -->
+                <div class="glass-card" style="display: flex; flex-direction: column; max-height: 480px;">
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="font-size: 1.1rem; font-weight: 600;">Match Feed Stream</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">LIVE UPDATES</span>
+                    </div>
+
+                    <!-- Stream list -->
+                    <div class="live-stream-records" id="live-stream-records">
+                        <!-- Placeholder empty state -->
+                        <div class="empty-state">
+                            <i class="ri-radar-line" style="animation: spin 3s infinite linear; display: inline-block;"></i>
+                            <p style="margin-top: 0.5rem;">Waiting for biometric scan hits...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Table logs directory -->
+            <div class="glass-card attendance-log-card">
+                <div class="log-header">
+                    <div>
+                        <h3 style="font-weight:600; font-size: 1.25rem;">Daily Attendance Ledger</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary);">Historical log indexes of verified sessions.</p>
+                    </div>
+                    <div class="search-filter-row">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" id="log-search-input" class="form-control" placeholder="Search student or roll number...">
+                        </div>
+                        <button class="btn btn-secondary" id="export-logs-btn" style="padding: 0.6rem 1.2rem; font-size: 0.9rem;">
+                            <i class="ri-download-line"></i> Export CSV
+                        </button>
+                        <button class="btn btn-secondary" id="clear-logs-btn" style="color: var(--error); border-color: rgba(239, 68, 68, 0.2); padding: 0.6rem 1.2rem; font-size: 0.9rem;">
+                            <i class="ri-delete-bin-line"></i> Reset Table
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ledger Grid Split -->
+                <div style="display: grid; grid-template-columns: 2.2fr 0.8fr; gap: 2rem; align-items: start;">
+                    <!-- Table Logs -->
+                    <div class="table-container">
+                        <table class="attendance-table">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Roll Number</th>
+                                    <th>Department</th>
+                                    <th>Scan Timestamp</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-table-body">
+                                <!-- JavaScript will insert logs here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Side Manual Attendance Marker -->
+                    <div class="glass-card" style="padding: 1.5rem; background: rgba(255, 255, 255, 0.01); border-color: var(--border-color);">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Manual Exception Marking</h4>
+                        <form id="manual-mark-form" style="display:flex; flex-direction:column; gap: 1rem;">
+                            <div>
+                                <label class="form-label" style="font-size: 0.8rem;" for="mark-student-select">Select Student</label>
+                                <select class="form-control" style="font-size: 0.85rem; padding: 0.6rem;" id="mark-student-select" required>
+                                    <option value="" disabled selected>Select a student...</option>
+                                    <!-- Populated via JS -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 0.8rem;" for="mark-status">Set Status</label>
+                                <select class="form-control" style="font-size: 0.85rem; padding: 0.6rem;" id="mark-status" required>
+                                    <option value="Present">Present</option>
+                                    <option value="Absent">Absent</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" type="submit" style="font-size: 0.85rem; padding: 0.6rem;">
+                                <i class="ri-check-line"></i> Save Record
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 0 1rem;">
+            <div>
+                © 2026 AURA Biometric Systems. Open source frontend demo.
+            </div>
+            <div>
+                Built with <i class="ri-heart-fill" style="color: var(--error);"></i> using HTML5, CSS3 Grid, and Vanilla JS.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Spin animation for waiting state -->
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Link Logic Script -->
+    <script src="static/js/app.js"></script>
+</body>
+</html>
