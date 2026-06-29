@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+
+# Uploaded Images
+storage/
+static/data/
+shape_predictor_68_face_landmarks.dat

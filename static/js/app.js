@@ -11,12 +11,13 @@ const STATE = {
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
-    initDatabase();
+    // initDatabase();
     setupNavigation();
     setupForms();
     setupWebcamHandlers();
     setupDragAndDrop();
-    updateDashboardStats();
+    // updateDashboardStats();
+    loadAttendanceLogs();
     renderAttendanceTable();
     renderStudentDropdown();
 
@@ -24,27 +25,27 @@ document.addEventListener("DOMContentLoaded", () => {
     navigateTo('landing-view');
 });
 
-// --- local DATABASE LOGIC ---
-function initDatabase() {
-    // Enrolled Students Setup
-    if (!localStorage.getItem('face_attendance_students')) {
-        localStorage.setItem('face_attendance_students', JSON.stringify([]));
-    }
+// // --- local DATABASE LOGIC ---
+// function initDatabase() {
+//     // Enrolled Students Setup
+//     if (!localStorage.getItem('face_attendance_students')) {
+//         localStorage.setItem('face_attendance_students', JSON.stringify([]));
+//     }
 
-    // Attendance Logs Setup
-    if (!localStorage.getItem('face_attendance_logs')) {
-        localStorage.setItem('face_attendance_logs', JSON.stringify([]));
-    }
-    STATE.attendanceLogs = JSON.parse(localStorage.getItem('face_attendance_logs'));
-}
+//     // Attendance Logs Setup
+//     if (!localStorage.getItem('face_attendance_logs')) {
+//         localStorage.setItem('face_attendance_logs', JSON.stringify([]));
+//     }
+//     STATE.attendanceLogs = JSON.parse(localStorage.getItem('face_attendance_logs'));
+// }
 
 function saveStudents() {
     renderStudentDropdown();
 }
 
 function saveLogs() {
-    localStorage.setItem('face_attendance_logs', JSON.stringify(STATE.attendanceLogs));
-    updateDashboardStats();
+    // localStorage.setItem('face_attendance_logs', JSON.stringify(STATE.attendanceLogs));
+    // updateDashboardStats();
     renderAttendanceTable();
 }
 
@@ -288,7 +289,7 @@ function setupForms() {
     // Student Enrollment Submission
     const enrollForm = document.getElementById('enroll-form');
     if (enrollForm) {
-        enrollForm.addEventListener('submit', (e) => {
+        enrollForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('enroll-name').value.trim();
             const rollNo = document.getElementById('enroll-roll').value.trim();
@@ -303,6 +304,58 @@ function setupForms() {
             const cameraContainer = document.querySelector('#enroll-view .viewfinder-card');
             cameraContainer.classList.add('scanning');
             showToast('Biometric Analysis', 'Registering face patterns... Please hold still.', 'info');
+
+            const video = document.getElementById('enroll-video');
+            const canvas = document.getElementById('enroll-canvas');
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            let frames = [];
+
+            setTimeout(() => {
+                showToast("Camera", "Capturing face images...", "info");
+            }, 2000);
+
+            for (let i = 0; i < 10; i++) {
+                ctx.drawImage(
+                    video,
+                    0,
+                    0
+                );
+                console.log(canvas);
+                const base64 = canvas.toDataURL("image/jpeg", 0.9);
+                console.log(base64.substring(0, 50));
+                frames.push(base64);
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            const response = await fetch("/api/enrollFace", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    name: name,
+                    rollNo: rollNo,
+                    department: dept,
+                    images: frames
+
+                })
+
+            });
+
+            const result = await response.json();
+            if (result.status == 'Success') {
+                cameraContainer.classList.remove('scanning');
+                showToast('Enrollment Complete', `${result.name} successfully registered in system view.`, 'success');
+                enrollForm.reset();
+            } else {
+                cameraContainer.classList.remove('scanning');
+                showToast('Enrollment Error', `${result.error}`, 'error');
+                enrollForm.reset();
+            }
 
             // setTimeout(() => {
             //     cameraContainer.classList.remove('scanning');
@@ -435,10 +488,10 @@ function startWebcam(videoElement, canvasElement, simulatedFeed, callback) {
     stopActiveCamera(); // Ensure clean start
 
     // Set canvas dimensions relative to bounding box
-    setTimeout(() => {
-        canvasElement.width = videoElement.clientWidth || 640;
-        canvasElement.height = videoElement.clientHeight || 480;
-    }, 100);
+    // setTimeout(() => {
+    //     canvasElement.width = videoElement.clientWidth || 640;
+    //     canvasElement.height = videoElement.clientHeight || 480;
+    // }, 100);
 
     // Constraints
     const constraints = {
@@ -451,17 +504,36 @@ function startWebcam(videoElement, canvasElement, simulatedFeed, callback) {
 
     navigator.mediaDevices.getUserMedia(constraints)
         .then(stream => {
+
             STATE.activeStream = stream;
             videoElement.srcObject = stream;
-            videoElement.play();
-            simulatedFeed.style.display = 'none';
-            if (callback) callback(true);
+
+            videoElement.onloadedmetadata = async () => {
+
+                await videoElement.play();
+
+                // Use actual camera resolution
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+
+                simulatedFeed.style.display = "none";
+
+                console.log("Video Size:",
+                    videoElement.videoWidth,
+                    videoElement.videoHeight
+                );
+
+                if (callback) callback(true);
+            };
+
         })
         .catch(err => {
-            console.warn("Webcam access failed, using simulated face stream.", err);
-            // Hide video element showing camera
+
+            console.error(err);
+
             videoElement.srcObject = null;
-            simulatedFeed.style.display = 'flex';
+            simulatedFeed.style.display = "flex";
+
             if (callback) callback(false);
         });
 }
@@ -475,6 +547,8 @@ function stopActiveCamera() {
 
 // --- ADMIN ATTENDANCE VIEW CONTROLS ---
 function initAdminAttendanceView() {
+
+    loadAttendanceLogs();   // <-- Load from DB
     // Default Tab
     switchAttendanceMode('webcam');
 
@@ -584,6 +658,33 @@ function drawAttendanceViewfinderGuide(canvas) {
     drawLoop();
 }
 
+async function loadAttendanceLogs() {
+    try {
+        const response = await fetch("/api/attendancelogs");
+        const result = await response.json();
+
+        if (result.status === "Success") {
+
+            STATE.attendanceLogs = result.data.map(item => ({
+                name: item.name,
+                id: item.id,
+                department: item.department,
+                status: item.status,
+                time: item.attendance_time,
+                date: new Date(item.attendance_date).toLocaleDateString(),
+                photoUrl: item.photoUrl
+            }));
+
+            renderAttendanceTable();
+
+        }
+
+    } catch (err) {
+        console.error(err);
+        showToast("Error", "Unable to load attendance records.", "error");
+    }
+}
+
 // Auto-scan logic
 function startAutoScanningLoop() {
     STATE.scanInterval = setInterval(() => {
@@ -601,21 +702,75 @@ function stopActiveScanning() {
     STATE.isScanning = false;
 }
 
-function triggerSingleWebcamScan() {
+async function triggerSingleWebcamScan() {
+
     if (STATE.isScanning) return;
+
     STATE.isScanning = true;
 
-    const cameraCard = document.querySelector('#attendance-webcam-pane .viewfinder-card');
-    cameraCard.classList.add('scanning');
-    showToast('Biometric Scanner', 'Tracking face coordinates...', 'info');
+    const cameraCard = document.querySelector(
+        '#attendance-webcam-pane .viewfinder-card'
+    );
 
-    // Simulate scan mapping delay
-    setTimeout(() => {
-        // Stop scanning animations
-        STATE.isScanning = false;
-        cameraCard.classList.remove('scanning');
-        showToast('Scan Completed', 'Face detected and tracked inside active frame.', 'success');
-    }, 2500);
+    cameraCard.classList.add("scanning");
+
+    showToast(
+        "Biometric Scanner",
+        "Scanning face...",
+        "info"
+    );
+
+    const video = document.getElementById("attendance-video");
+    const canvas = document.getElementById("attendance-canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const frames = [];
+
+    for (let i = 0; i < 50; i++) {
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        frames.push(
+            canvas.toDataURL("image/jpeg", 0.8)
+        );
+
+        await new Promise(resolve => setTimeout(resolve, 80));
+    }
+
+    const response = await fetch("/api/attendance", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            images: frames
+        })
+    });
+
+    const result = await response.json();
+
+    STATE.isScanning = false;
+    cameraCard.classList.remove("scanning");
+
+    if (result.status === "Success") {
+        showToast(
+            "Attendance",
+            `${result.student['name']} marked successfully.`,
+            "success"
+        );
+
+        await loadAttendanceLogs();   // Refresh table
+    }
+    else {
+        showToast(
+            "Attendance",
+            "Face not recognized.",
+            "error"
+        );
+    }
 }
 
 function logAttendance(student) {
@@ -771,30 +926,47 @@ function handleImageUpload(file) {
             showToast('Analyzing Image', 'Locating face coordinates...', 'info');
 
             // Draw bounding box after a scan delay
-            setTimeout(() => {
+            setTimeout(async () => {
                 if (STATE.currentView !== 'admin-view' || STATE.activeScannerMode !== 'upload') return;
 
-                // Pick coordinates inside the canvas randomly to look like real face bounds
-                const imgW = canvas.width;
-                const imgH = canvas.height;
-                const boxW = Math.min(imgW * 0.4, 150);
-                const boxH = Math.min(imgH * 0.4, 150);
-                const boxX = (imgW - boxW) / 2;
-                const boxY = (imgH - boxH) / 2.5;
+                ctx.drawImage(previewImg, 0, 0, canvas.width, canvas.height);
 
-                ctx.strokeStyle = '#10b981'; // Green
-                ctx.lineWidth = 3;
-                ctx.strokeRect(boxX, boxY, boxW, boxH);
+                // frames.push(
+                //     canvas.toDataURL("image/jpeg", 0.8)
+                // );
 
-                // Add bounding title label
-                ctx.fillStyle = '#10b981';
-                ctx.fillRect(boxX, boxY - 20, 120, 20);
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '600 10px Outfit';
-                ctx.fillText("FACE DETECTED", boxX + 6, boxY - 6);
+                const response = await fetch("/api/imageattendance", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        image: canvas.toDataURL("image/jpeg", 0.8)
+                    })
+                });
 
-                previewContainer.classList.remove('scanning');
-                showToast('Analysis Complete', 'Face coordinates mapped in image.', 'success');
+                const result = await response.json();
+
+                if (result.status === "Success") {
+                    showToast(
+                        "Attendance",
+                        `${result.student['name']} marked successfully.`,
+                        "success"
+                    );
+
+                    await loadAttendanceLogs();   // Refresh table
+                }
+                else {
+                    showToast(
+                        "Attendance",
+                        "Face not recognized.",
+                        "error"
+                    );
+                }
+                // setTimeout(() => {
+                //     previewContainer.classList.remove('scanning');
+                //     showToast('Analysis Complete', 'Face coordinates mapped in image.', 'success');
+                // }, 2000);
             }, 2000);
         };
     };
@@ -815,26 +987,26 @@ function setupWebcamHandlers() {
 }
 
 // --- STATS & LOGS MANAGEMENT ---
-function updateDashboardStats() {
+// function updateDashboardStats() {
 
-    // Present students today
-    const today = new Date().toLocaleDateString();
-    const presentTodayCount = STATE.attendanceLogs.filter(
-        log => log.date === today && log.status === 'Present'
-    ).length;
+//     // Present students today
+//     const today = new Date().toLocaleDateString();
+//     const presentTodayCount = STATE.attendanceLogs.filter(
+//         log => log.date === today && log.status === 'Present'
+//     ).length;
 
-    // Absent count
-    const absentCount = Math.max(0, totalStudents - presentTodayCount);
+//     // Absent count
+//     const absentCount = Math.max(0, totalStudents - presentTodayCount);
 
-    // Update UI elements
-    const totalEl = document.getElementById('stat-total-students');
-    const presentEl = document.getElementById('stat-present-today');
-    const absentEl = document.getElementById('stat-absent-today');
+//     // Update UI elements
+//     const totalEl = document.getElementById('stat-total-students');
+//     const presentEl = document.getElementById('stat-present-today');
+//     const absentEl = document.getElementById('stat-absent-today');
 
-    if (totalEl) totalEl.textContent = totalStudents;
-    if (presentEl) presentEl.textContent = presentTodayCount;
-    if (absentEl) absentEl.textContent = absentCount;
-}
+//     if (totalEl) totalEl.textContent = totalStudents;
+//     if (presentEl) presentEl.textContent = presentTodayCount;
+//     if (absentEl) absentEl.textContent = absentCount;
+// }
 
 function renderAttendanceTable() {
     const tbody = document.getElementById('attendance-table-body');
